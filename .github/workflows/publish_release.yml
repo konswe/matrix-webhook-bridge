@@ -1,12 +1,15 @@
 ---
 
 name: "Publish Release"
-run-name: "Release ${{ github.ref_name }}"
+run-name: "Release ${{ inputs.version }}"
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (vX.Y.Z)"
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,12 +20,67 @@ permissions:
   packages: write
 
 jobs:
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Validate version format
+        run: |
+          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: version '${{ inputs.version }}' does not match vX.Y.Z format"
+            exit 1
+          fi
+          echo "Version ${{ inputs.version }} is valid"
+
+  bump-version:
+    name: Bump Version
+    runs-on: ubuntu-latest
+    needs: validate-version
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "${{ vars.GIT_USER_NAME }}"
+          git config user.email "${{ vars.GIT_USER_EMAIL }}"
+
+      - name: Bump version strings
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          VERSION_NO_V="${VERSION#v}"
+          sed -i "s/^version = .*/version = \"${VERSION_NO_V}\"/" pyproject.toml
+          sed -i "s/^VERSION=.*/VERSION=${VERSION}/" .env.example
+          sed -i "s/VERSION=v[0-9]*\.[0-9]*\.[0-9]*/VERSION=${VERSION}/g" INSTALL.md
+
+      - name: Commit and tag
+        id: commit
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git add pyproject.toml .env.example INSTALL.md
+          git commit -m "bump version to ${VERSION}"
+          git tag "${VERSION}"
+          git push origin main
+          git push origin "${VERSION}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   run-tests:
     name: Run Tests
     runs-on: ubuntu-latest
+    needs: bump-version
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,22 +96,23 @@ jobs:
   publish-image:
     name: Publish Image
     runs-on: ubuntu-latest
-    needs: run-tests
+    needs: [run-tests, bump-version]
     timeout-minutes: 30
-    environment: release
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
 
       - name: Publish image
         uses: ./.github/actions/publish_image
         with:
           registry: ghcr.io
           image_name: ${{ github.repository }}
-          version: ${{ github.ref_name }}
+          version: ${{ inputs.version }}
           maintainer: ${{ vars.MAINTAINER }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          sha: ${{ github.sha }}
+          sha: ${{ needs.bump-version.outputs.sha }}
           server_url: ${{ github.server_url }}
 
   create-release:
@@ -68,7 +127,7 @@ jobs:
             await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: context.ref.replace('refs/tags/', ''),
-              name: context.ref.replace('refs/tags/', ''),
+              tag_name: '${{ inputs.version }}',
+              name: '${{ inputs.version }}',
               generate_release_notes: true,
             });
