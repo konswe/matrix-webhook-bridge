@@ -21,6 +21,9 @@ Application Service token._
 
 See [INSTALL.md](INSTALL.md) for adding senders, health checks, and configuration reference.
 
+See [MATRIX.md](MATRIX.md) for setting up the Matrix Application Service and inviting the AS bot
+user to the room.
+
 ## Sending messages
 
 Any HTTP client can post to `/notify`:
