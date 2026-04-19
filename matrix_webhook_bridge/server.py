@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import re
 import signal
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,6 +14,37 @@ from .matrix import _token, _token_path, notify
 logger = logging.getLogger(__name__)
 
 _start_time = time.monotonic()
+_SECRETS_DIR = "/run/secrets"
+_AS_TOKEN_RE = re.compile(r"^(.+)_as_token\.txt$")
+
+
+def _pre_flight_check(config: Config) -> None:
+    logger.info("Performing pre-flight check...")
+
+    bridge_token_path = os.path.join(_SECRETS_DIR, "bridge_as_token.txt")
+    if not os.path.isfile(bridge_token_path):
+        raise RuntimeError(
+            f"Required secret not found: {bridge_token_path}. "
+            "Cannot start server without bridge appservice token."
+        )
+
+    available_tokens: list[str] = []
+    try:
+        entries = os.listdir(_SECRETS_DIR)
+    except FileNotFoundError:
+        entries = []
+
+    for entry in sorted(entries):
+        m = _AS_TOKEN_RE.match(entry)
+        if m:
+            available_tokens.append(m.group(1))
+        else:
+            logger.warning(
+                "Secret file does not follow naming convention <name>_as_token.txt: %s",
+                entry,
+            )
+
+    logger.info("Available appservice tokens: %s", ", ".join(available_tokens))
 
 
 def _format_uptime(seconds: int) -> str:
@@ -91,6 +124,7 @@ def _make_handler(config: Config) -> type:
 
 
 def run_server(config: Config) -> None:
+    _pre_flight_check(config)
     signal.signal(
         signal.SIGHUP,
         lambda *_: (
