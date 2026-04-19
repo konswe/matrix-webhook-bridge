@@ -1,0 +1,73 @@
+---
+
+name: "Publish Release"
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  run-tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install pytest .
+
+      - name: Run tests
+        run: pytest
+
+  publish-image:
+    name: Publish Image
+    runs-on: ubuntu-latest
+    needs: run-tests
+    timeout-minutes: 30
+    environment: release
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Publish image
+        uses: ./.github/actions/publish_image
+        with:
+          registry: ghcr.io
+          image_name: ${{ github.repository }}
+          version: ${{ github.ref_name }}
+          maintainer: ${{ vars.MAINTAINER }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          sha: ${{ github.sha }}
+          server_url: ${{ github.server_url }}
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: publish-image
+    steps:
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: context.ref.replace('refs/tags/', ''),
+              name: context.ref.replace('refs/tags/', ''),
+              generate_release_notes: true,
+            });
