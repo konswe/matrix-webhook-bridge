@@ -25,6 +25,7 @@ MD033:
     - img
     - details
     - summary
+    - div
 
 # MD041/first-line-heading - First line in file should be a top level heading
 MD041: false
