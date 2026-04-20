@@ -22,7 +22,7 @@ def _token(path: str) -> str:
 
 
 def notify(
-    base_url: str, room_id: str, plain: str, html: str, token_file: str, user_id: str
+    base_url: str, room_id: str, plain: str, html: str, token_file: str, user_id: str, timeout: int = 5
 ) -> None:
     """Send a message to the Matrix room."""
     txn = int(time.time() * 1000)
@@ -49,7 +49,7 @@ def notify(
     )
     logger.debug(f"Sending Matrix message as {user_id}: {plain}")
     try:
-        with urlopen(req) as r:
+        with urlopen(req, timeout=timeout) as r:
             r.read()
     except HTTPError as e:
         # The JSON body carries the real reason (errcode, error, retry_after_ms).

@@ -18,6 +18,7 @@ VERSION=v0.1.1
 MATRIX_BASE_URL=https://matrix.example.com
 MATRIX_ROOM_ID=!roomid:matrix.example.com
 MATRIX_DOMAIN=matrix.example.com
+MATRIX_TIMEOUT=5
 ```
 
 ### Add the Application Service token
@@ -46,13 +47,14 @@ docker compose exec bridge matrix-webhook-bridge healthcheck
 
 ## Configuration reference
 
-| Variable          | CLI flag         | Required | Default  | Description                                    |
-| ----------------- | ---------------- | -------- | -------- | ---------------------------------------------- |
-| `MATRIX_BASE_URL` | `--base-url`     | yes      | —        | Matrix homeserver URL                          |
-| `MATRIX_ROOM_ID`  | `--room-id`      | yes      | —        | Target room ID                                 |
-| `MATRIX_DOMAIN`   | `--domain`       | yes      | —        | Homeserver domain                              |
-| `PORT`            | `--port`         | no       | `5001`   | Port to listen on                              |
-| `DEFAULT_USER`    | `--default-user` | no       | `bridge` | Fallback sender when no `user` param is given  |
+| Variable          | CLI flag            | Required | Default  | Description                                    |
+| ----------------- | ------------------- | -------- | -------- | ---------------------------------------------- |
+| `MATRIX_BASE_URL` | `--base-url`        | yes      | —        | Matrix homeserver URL                          |
+| `MATRIX_ROOM_ID`  | `--room-id`         | yes      | —        | Target room ID                                 |
+| `MATRIX_DOMAIN`   | `--domain`          | yes      | —        | Homeserver domain                              |
+| `MATRIX_TIMEOUT`  | `--matrix-timeout`  | no       | `5`      | Timeout for Matrix API requests (seconds)      |
+| `PORT`            | `--port`            | no       | `5001`   | Port to listen on                              |
+| `DEFAULT_USER`    | `--default-user`    | no       | `bridge` | Fallback sender when no `user` param is given  |
 
 ## Alertmanager
 

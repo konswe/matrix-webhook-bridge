@@ -8,3 +8,4 @@ class Config:
     domain: str
     port: int = 5001
     default_user: str = "bridge"
+    matrix_timeout: int = 5
