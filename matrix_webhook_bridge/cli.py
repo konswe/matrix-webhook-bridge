@@ -35,6 +35,7 @@ def _cmd_serve(args: argparse.Namespace) -> None:
             domain=args.domain,
             port=args.port,
             default_user=args.default_user,
+            matrix_timeout=args.matrix_timeout,
         )
     )
 
@@ -98,6 +99,13 @@ def main() -> None:
         default=os.environ.get("DEFAULT_USER", "bridge"),
         metavar="USER",
         help="Fallback Matrix user localpart [env: DEFAULT_USER] (default: bridge)",
+    )
+    serve.add_argument(
+        "--matrix-timeout",
+        type=int,
+        default=int(os.environ.get("MATRIX_TIMEOUT", 5)),
+        metavar="SECONDS",
+        help="Timeout for Matrix API requests in seconds [env: MATRIX_TIMEOUT] (default: 5)",
     )
 
     # healthcheck

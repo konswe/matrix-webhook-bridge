@@ -14,6 +14,7 @@ services:
       MATRIX_BASE_URL: ${MATRIX_BASE_URL:?MATRIX_BASE_URL is required (e.g. https://matrix.example.com)}
       MATRIX_ROOM_ID: ${MATRIX_ROOM_ID:?MATRIX_ROOM_ID is required (e.g. !roomid:matrix.example.com)}
       MATRIX_DOMAIN: ${MATRIX_DOMAIN:?MATRIX_DOMAIN is required (e.g. matrix.example.com)}
+      MATRIX_TIMEOUT: ${MATRIX_TIMEOUT:-5}
       PORT: ${PORT:-5001}
       DEFAULT_USER: ${DEFAULT_USER:-bridge}
     secrets:

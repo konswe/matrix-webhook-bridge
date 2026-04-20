@@ -107,7 +107,7 @@ def _make_handler(config: Config) -> type:
             failed = False
             for plain, html in format_fn(data):
                 try:
-                    notify(config.base_url, config.room_id, plain, html, _token_path(user), user_id)
+                    notify(config.base_url, config.room_id, plain, html, _token_path(user), user_id, config.matrix_timeout)
                 except Exception as e:
                     logger.error(
                         "notify failed",

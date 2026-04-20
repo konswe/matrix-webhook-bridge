@@ -89,7 +89,7 @@ def send(payload: dict) -> None:
         method="POST",
     )
     try:
-        urllib.request.urlopen(req)
+        urllib.request.urlopen(req, timeout=5)
     except urllib.error.URLError as e:
         logger.error("Failed to send notification via matrix-webhook-bridge: %s", e)
 

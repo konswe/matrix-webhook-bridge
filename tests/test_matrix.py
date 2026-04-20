@@ -40,6 +40,7 @@ def test_notify_success_path(tmp_path):
             html="<b>hello</b>",
             token_file=str(token),
             user_id="@bot:example.org",
+            timeout=5,
         )
 
 
@@ -73,6 +74,7 @@ def test_notify_http_error_includes_response_body(tmp_path, caplog):
                 html="<b>hello</b>",
                 token_file=str(token),
                 user_id="@bot:example.org",
+                timeout=30,
             )
 
     # The body must be in the log record
@@ -112,6 +114,7 @@ def test_notify_http_error_unreadable_body_does_not_crash(tmp_path, caplog):
                 html="<b>hello</b>",
                 token_file=str(token),
                 user_id="@bot:example.org",
+                timeout=30,
             )
 
     # Must have logged something even though reading the body failed
