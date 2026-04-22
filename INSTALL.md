@@ -88,7 +88,7 @@ The health-check endpoint (`GET /healthy`) is never authenticated.
 ### CLI Usage
 
 ```sh
-matrix-webhook-bridge serve --config /path/to/config.yml
+matrix-webhook-bridge serve --config /path/to/bridge.yml
 ```
 
 ## Alertmanager

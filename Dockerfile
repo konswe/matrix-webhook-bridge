@@ -48,4 +48,4 @@ EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget --spider -q http://localhost:5001/healthy || exit 1
 
-CMD ["matrix-webhook-bridge", "serve", "--config", "/etc/matrix-webhook-bridge/config.yml"]
+CMD ["matrix-webhook-bridge", "serve", "--config", "/etc/matrix-webhook-bridge/bridge.yml"]
