@@ -13,7 +13,7 @@ if [ -f config/bridge.yml ]; then
   echo "config/bridge.yml already exists, skipping."
 else
   echo "Downloading config/bridge.yml..."
-  curl -fsSL "$BASE_URL/config.yml.example" -o config/bridge.yml
+  curl -fsSL "$BASE_URL/bridge.yml.example" -o config/bridge.yml
 fi
 
 echo ""
