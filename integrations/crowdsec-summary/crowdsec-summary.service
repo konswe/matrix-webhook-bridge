@@ -1,0 +1,11 @@
+[Unit]
+Description=Send daily CrowdSec summary via matrix-webhook-bridge
+Documentation=https://github.com/krahlos/matrix-webhook-bridge
+After=crowdsec.service
+Requires=crowdsec.service
+
+[Service]
+Type=oneshot
+ExecStart=/etc/crowdsec/notify-summary.py
+Environment=MATRIX_WEBHOOK_BRIDGE_URL=http://localhost:5001
+Environment=SINCE=24h

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily CrowdSec summary report
+Requires=crowdsec-summary.service
+
+[Timer]
+OnCalendar=08:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
