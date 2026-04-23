@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -10,3 +10,4 @@ class Config:
     default_user: str = "bridge"
     matrix_timeout: int = 5
     webhook_secret: str | None = None
+    service_users: dict[str, str] = field(default_factory=dict)
