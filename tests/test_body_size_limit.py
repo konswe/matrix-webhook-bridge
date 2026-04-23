@@ -1,13 +1,13 @@
 """Tests for /notify request body size limit."""
 
-from http.server import HTTPServer
-from threading import Thread
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
+from starlette.testclient import TestClient
 
 from matrix_webhook_bridge.config import Config
-from matrix_webhook_bridge.server import _make_handler
+from matrix_webhook_bridge.server import _get_config, app
 
 
 @pytest.fixture
@@ -27,27 +27,13 @@ def _make_config(**overrides) -> Config:
     return Config(**defaults)
 
 
-def _start_server(config):
-    handler = _make_handler(config)
-    server = HTTPServer(("127.0.0.1", 0), handler)
-    port = server.server_address[1]
-    Thread(target=server.serve_forever, daemon=True).start()
-    return server, port
-
-
-def _post_raw(port, data: bytes):
-    import http.client
-
-    conn = http.client.HTTPConnection("127.0.0.1", port)
-    conn.request(
-        "POST",
-        "/notify",
-        body=data,
-        headers={"Content-Type": "application/json", "Content-Length": str(len(data))},
-    )
-    resp = conn.getresponse()
-    conn.close()
-    return resp.status
+@contextmanager
+def _make_client(config):
+    app.dependency_overrides[_get_config] = lambda: config
+    app.state.config = config
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
+    app.dependency_overrides.clear()
 
 
 @pytest.mark.usefixtures("_mock_secrets")
@@ -55,21 +41,16 @@ class TestBodySizeLimit:
     def test_body_at_limit_is_accepted(self):
         """A 1 MB body must not be rejected with 413."""
         config = _make_config()
-        server, port = _start_server(config)
-        with patch("matrix_webhook_bridge.server.notify"):
-            payload = b'{"body": "' + b"x" * (1_048_576 - 12) + b'"}'
-            try:
-                assert _post_raw(port, payload) != 413
-            finally:
-                server.shutdown()
+        payload = b'{"body": "' + b"x" * (1_048_576 - 12) + b'"}'
+        with _make_client(config) as client:
+            with patch("matrix_webhook_bridge.server._matrix_notify"):
+                resp = client.post("/notify", content=payload)
+                assert resp.status_code != 413
 
     def test_body_over_limit_returns_413(self):
         """A body exceeding 1 MB must be rejected with 413."""
         config = _make_config()
-        server, port = _start_server(config)
-        with patch("matrix_webhook_bridge.server.notify"):
-            payload = b"x" * 1_048_577
-            try:
-                assert _post_raw(port, payload) == 413
-            finally:
-                server.shutdown()
+        payload = b"x" * 1_048_577
+        with _make_client(config) as client:
+            resp = client.post("/notify", content=payload)
+            assert resp.status_code == 413

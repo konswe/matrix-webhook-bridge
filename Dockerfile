@@ -21,7 +21,6 @@ LABEL org.opencontainers.image.source="https://github.com/krahlos/matrix-webhook
 LABEL org.opencontainers.image.description="Webhook-to-Matrix notification bridge with per-sender bot users"
 LABEL maintainer="${MAINTAINER}"
 
-# wget is needed for the HEALTHCHECK probe
 RUN apt-get update \
  && apt-get install -y --no-install-recommends wget \
  && rm -rf /var/lib/apt/lists/*
@@ -46,6 +45,6 @@ USER bridge
 EXPOSE 5001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --spider -q http://localhost:5001/healthy || exit 1
+    CMD ["matrix-webhook-bridge", "healthcheck"]
 
 CMD ["matrix-webhook-bridge", "serve", "--config", "/etc/matrix-webhook-bridge/bridge.yml"]
