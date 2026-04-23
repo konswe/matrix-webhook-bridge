@@ -2,13 +2,20 @@
 
 ## Quick start
 
-Run the installer to download `docker-compose.yml` and create a `config/bridge.yml` from the example:
+Run the installer in an **empty** directory. It downloads `docker-compose.yml`, creates
+`config/bridge.yml`, generates the AS token, and bootstraps `bridge-registration.yml`. It will
+refuse to run if any of those paths already exist.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/krahlos/matrix-webhook-bridge/main/install.sh | sh
 ```
 
-### Configure
+### Manual Steps
+
+The installer downloads `docker-compose.yml`, creates `config/bridge.yml` from the example,
+generates `secrets/bridge_as_token.txt`, and bootstraps an `bridge-registration.yml` with the
+token already filled in. What it cannot do is register the Application Service with your
+Synapse — that must be done manually.
 
 Edit `config/bridge.yml` with your Matrix homeserver details:
 
@@ -24,23 +31,24 @@ server:
   default_user: bridge
 ```
 
-### Add the Application Service token
+Mount the `bridge-registration.yml` as an Application Service in your Synapse:
 
-```sh
-mkdir secrets
-echo "your_as_token_here" > secrets/bridge_as_token.txt
+```yaml
+app_service_config_files:
+  - /path/to/bridge-registration.yml
 ```
+
+> [!TIP]
+> Create an `applications` directory next to your `synapse/docker-compose.yml`
+> and `mv` the `bridge-registration.yml` there. Then mount `/applications` as a volume
+> in your Synapse and use `/applications/bridge-registration.yml` as the path in
+> `app_service_config_files`.
 
 ### Start
 
 ```sh
 docker compose up -d
 ```
-
-## Adding senders
-
-Each sender needs its own Application Service token mounted at
-`/run/secrets/<user>_as_token.txt`.
 
 ## Health check
 
@@ -84,25 +92,3 @@ Authorization: Bearer my-secret-token
 
 Requests with a missing or incorrect token receive `401 Unauthorized`.
 The health-check endpoint (`GET /healthy`) is never authenticated.
-
-### CLI Usage
-
-```sh
-matrix-webhook-bridge serve --config /path/to/bridge.yml
-```
-
-## Alertmanager
-
-Download the override file and add the Alertmanager token:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/krahlos/matrix-webhook-bridge/main/docker-compose.override.yml -o docker-compose.override.yml
-echo "your_alertmanager_as_token_here" > secrets/alertmanager_as_token.txt
-docker compose up -d
-```
-
-Then point Alertmanager's webhook receiver at:
-
-```text
-http://localhost:5001/notify?service=alertmanager
-```

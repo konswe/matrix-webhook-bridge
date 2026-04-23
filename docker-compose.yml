@@ -11,10 +11,4 @@ services:
       - "5001:5001"
     volumes:
       - ./config/bridge.yml:/etc/matrix-webhook-bridge/bridge.yml:ro
-    secrets:
-      - bridge_as_token.txt
-    command: ["matrix-webhook-bridge", "serve", "--config", "/etc/matrix-webhook-bridge/bridge.yml"]
-
-secrets:
-  bridge_as_token.txt:
-    file: ./secrets/bridge_as_token.txt
+      - ./secrets:/run/secrets:ro
