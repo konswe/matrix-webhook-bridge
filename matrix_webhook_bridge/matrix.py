@@ -7,6 +7,8 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+VERSIONS_PATH = "/_matrix/client/versions"
+
 logger = logging.getLogger(__name__)
 
 _SECRETS_DIR = "/run/secrets"
@@ -20,6 +22,14 @@ def _token_path(user: str) -> str:
 @lru_cache
 def _token(path: str) -> str:
     return open(path).read().strip()
+
+
+def probe(base_url: str, timeout: int = 5) -> None:
+    """GET /_matrix/client/versions to check homeserver reachability."""
+    url = f"{base_url}{VERSIONS_PATH}"
+    req = Request(url, method="GET")
+    with urlopen(req, timeout=timeout) as r:
+        r.read()
 
 
 def notify(

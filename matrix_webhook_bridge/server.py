@@ -18,6 +18,7 @@ from .formatters import SERVICES, format_generic
 from .log import request_id as _request_id
 from .matrix import _SECRETS_DIR, _token, _token_path
 from .matrix import notify as _matrix_notify
+from .matrix import probe as _matrix_probe
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,18 @@ def _check_auth(
 def healthy(config: Config = Depends(_get_config)):
     uptime = _format_uptime(int(time.monotonic() - _start_time))
     return {"status": "ok", "uptime": uptime}
+
+
+@app.get("/healthy/matrix")
+async def healthy_matrix(config: Config = Depends(_get_config)):
+    try:
+        await asyncio.to_thread(_matrix_probe, config.base_url, config.matrix_timeout)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "error", "base_url": config.base_url, "detail": str(e)},
+        )
+    return {"status": "ok", "base_url": config.base_url}
 
 
 @app.post("/notify")
