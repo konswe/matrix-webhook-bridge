@@ -1,0 +1,13 @@
+---
+id: bridge
+url: ~ # null - this is a send-only appservice
+as_token: <your_as_token_here>
+hs_token: <your_hs_token_here>
+sender_localpart: bridge
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: true
+      regex: "@bridge:matrix\\.example\\.org"
+  aliases: []
+  rooms: []

@@ -20,7 +20,7 @@ Application Service token._
 
 ## Setup
 
-See [INSTALL.md](INSTALL.md) for adding senders, health checks, and configuration reference.
+See [INSTALL.md](INSTALL.md) for health checks and configuration reference.
 
 See [MATRIX.md](MATRIX.md) for setting up the Matrix Application Service and inviting the AS bot
 user to the room.
@@ -58,46 +58,3 @@ in `bridge.yml` maps each service name to its user localpart. If the service is 
 | Service                  | `?service=` value | Description                                              |
 | ------------------------ | ----------------- | -------------------------------------------------------- |
 | Prometheus Alertmanager  | `alertmanager`    | Colour-coded alerts with severity, description and links |
-
-## Adding a new service
-
-**1. Write a formatter** in `matrix_webhook_bridge/formatters/<service>.py`. A formatter takes
-the raw webhook payload and returns a list of `(plain, html)` tuples — one per Matrix message:
-
-```python
-def format_myservice(data: dict) -> list[tuple[str, str]]:
-    plain = f"Event: {data['event']}"
-    html = f"<b>Event:</b> {data['event']}"
-    return [(plain, html)]
-```
-
-**2. Register it** in `matrix_webhook_bridge/formatters/__init__.py`:
-
-```python
-from .myservice import format_myservice
-
-SERVICES: dict[str, callable] = {
-    "alertmanager": format_alertmanager,
-    "myservice": format_myservice,
-}
-```
-
-**3. Add the token secret.** Create the secret file and wire it into `docker-compose.yml`:
-
-```shell
-openssl rand -hex 32 > secrets/myservice_as_token.txt
-```
-
-```yaml
-secrets:
-  myservice_as_token.txt:
-    file: ./secrets/myservice_as_token.txt
-
-services:
-  bridge:
-    secrets:
-      - myservice_as_token.txt
-```
-
-The bridge will then accept `POST /notify?service=myservice` and send messages impersonating
-`@myservice:<domain>` using that token.
