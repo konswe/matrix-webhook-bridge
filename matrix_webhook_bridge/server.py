@@ -1,16 +1,21 @@
+import asyncio
 import hmac
 import json
 import logging
 import os
 import re
 import signal
+import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Request
 
 from .config import Config
 from .formatters import SERVICES, format_generic
-from .matrix import _SECRETS_DIR, _token, _token_path, notify
+from .matrix import _SECRETS_DIR, _token, _token_path
+from .matrix import notify as _matrix_notify
 
 logger = logging.getLogger(__name__)
 
@@ -69,124 +74,96 @@ def _format_uptime(seconds: int) -> str:
     return f"{d}d {h}h {m}m"
 
 
-def _make_handler(config: Config) -> type:
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            if self.path == "/healthy":
-                logger.debug(f"Healthcheck from {self.client_address}")
-                uptime = _format_uptime(int(time.monotonic() - _start_time))
-                body = json.dumps({"status": "ok", "uptime": uptime}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-            else:
-                logger.warning(f"GET {self.path} not found from {self.client_address}")
-                self.send_response(404)
-                self.end_headers()
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    _pre_flight_check(app.state.config)
+    if threading.current_thread() is threading.main_thread():
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(
+            signal.SIGHUP,
+            lambda: (_token.cache_clear(), logger.info("Token cache cleared via SIGHUP")),
+        )
+    yield
 
-        def _check_auth(self) -> bool:
-            if not config.webhook_secret:
-                return True
-            auth = self.headers.get("Authorization", "")
-            expected = f"Bearer {config.webhook_secret}"
-            if not hmac.compare_digest(auth, expected):
-                logger.warning(
-                    "Unauthorized request from %s",
-                    self.client_address,
-                )
-                self.send_response(401)
-                self.end_headers()
-                return False
-            return True
 
-        def do_POST(self):
-            parsed = urlparse(self.path)
-            if parsed.path != "/notify":
-                logger.warning(f"POST {self.path} not found from {self.client_address}")
-                self.send_response(404)
-                self.end_headers()
-                return
+app = FastAPI(lifespan=_lifespan)
 
-            if not self._check_auth():
-                return
 
-            params = parse_qs(parsed.query)
-            service = params.get("service", [None])[0]
-            user = config.service_users.get(service) if service else None
-            user = user or config.default_user
+def _get_config(request: Request) -> Config:
+    return request.app.state.config
 
-            format_fn = SERVICES.get(service, format_generic)
-            user_id = f"@{user}:{config.domain}"
 
-            logger.info(
-                "POST /notify",
-                extra={
-                    "service": service,
-                    "user": user,
-                    "client": str(self.client_address),
-                },
+def _check_auth(
+    request: Request,
+    config: Config = Depends(_get_config),
+) -> None:
+    if not config.webhook_secret:
+        return
+    auth = request.headers.get("Authorization", "")
+    if not hmac.compare_digest(auth, f"Bearer {config.webhook_secret}"):
+        raise HTTPException(status_code=401)
+
+
+@app.get("/healthy")
+def healthy(config: Config = Depends(_get_config)):
+    uptime = _format_uptime(int(time.monotonic() - _start_time))
+    return {"status": "ok", "uptime": uptime}
+
+
+@app.post("/notify")
+async def notify(
+    request: Request,
+    service: str | None = None,
+    config: Config = Depends(_get_config),
+    _: None = Depends(_check_auth),
+):
+    body = await request.body()
+    if len(body) > 1_048_576:
+        raise HTTPException(status_code=413)
+    try:
+        data = json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400)
+
+    user = config.service_users.get(service) if service else None
+    user = user or config.default_user
+    format_fn = SERVICES.get(service, format_generic)
+    user_id = f"@{user}:{config.domain}"
+
+    logger.info(
+        "POST /notify",
+        extra={
+            "service": service,
+            "user": user,
+            "client": request.client.host if request.client else "unknown",
+        },
+    )
+
+    failed = False
+    for plain, html in format_fn(data):
+        try:
+            await asyncio.to_thread(
+                _matrix_notify,
+                config.base_url,
+                config.room_id,
+                plain,
+                html,
+                _token_path(user),
+                user_id,
+                config.matrix_timeout,
             )
-            try:
-                content_length = int(self.headers["Content-Length"])
-                if content_length > 1_048_576:
-                    self.send_response(413)
-                    self.end_headers()
-                    return
-                raw_data = self.rfile.read(content_length)
-                data = json.loads(raw_data)
-                logger.debug(f"Received data: {data}")
-            except Exception as e:
-                logger.error(f"Failed to parse JSON: {e}")
-                self.send_response(400)
-                self.end_headers()
-                return
+        except Exception as e:
+            logger.error(
+                "notify failed",
+                extra={"service": service, "user": user, "error": str(e)},
+            )
+            failed = True
 
-            failed = False
-            for plain, html in format_fn(data):
-                try:
-                    notify(
-                        config.base_url,
-                        config.room_id,
-                        plain,
-                        html,
-                        _token_path(user),
-                        user_id,
-                        config.matrix_timeout,
-                    )
-                except Exception as e:
-                    logger.error(
-                        "notify failed",
-                        extra={"service": service, "user": user, "error": str(e)},
-                    )
-                    failed = True
-            self.send_response(500 if failed else 200)
-            self.end_headers()
-
-        def log_message(self, *_) -> None:
-            pass
-
-    return Handler
+    if failed:
+        raise HTTPException(status_code=500)
 
 
 def run_server(config: Config) -> None:
-    _pre_flight_check(config)
-    signal.signal(
-        signal.SIGHUP,
-        lambda *_: (
-            _token.cache_clear(),
-            logger.info("Token cache cleared via SIGHUP"),
-        ),
-    )
-    server = ThreadingHTTPServer(("", config.port), _make_handler(config))
+    app.state.config = config
     logger.info(f"Starting Matrix notifier server on port {config.port}...")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        logger.info("Received shutdown signal (KeyboardInterrupt). Shutting down gracefully...")
-    except Exception as e:
-        logger.error(f"Server error: {e}")
-    finally:
-        server.server_close()
-        logger.info("Matrix notifier server stopped.")
+    uvicorn.run(app, host="", port=config.port, access_log=False)

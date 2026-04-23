@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import sys
 from urllib.request import Request, urlopen
 
@@ -28,7 +29,7 @@ def _cmd_serve(args: argparse.Namespace) -> None:
 
 
 def _cmd_healthcheck(args: argparse.Namespace) -> None:
-    port = args.port or 5001
+    port = args.port or int(os.environ.get("PORT", 5001))
     try:
         urlopen(f"http://localhost:{port}/healthy")
     except Exception:
