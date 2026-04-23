@@ -309,6 +309,51 @@ matrix:
         Path(config_path).unlink()
 
 
+def test_load_config_with_service_users():
+    """service_users mapping is loaded when present."""
+    yaml_content = """
+matrix:
+  base_url: https://matrix.example.com
+  room_id: "!test:example.com"
+  domain: example.com
+
+server:
+  service_users:
+    alertmanager: alertmanager
+    borgmatic: borgmatic
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
+        f.write(yaml_content)
+        f.flush()
+        config_path = f.name
+
+    try:
+        config = load_config_from_yaml(config_path)
+        assert config.service_users == {"alertmanager": "alertmanager", "borgmatic": "borgmatic"}
+    finally:
+        Path(config_path).unlink()
+
+
+def test_load_config_service_users_defaults_to_empty():
+    """service_users defaults to empty dict when omitted."""
+    yaml_content = """
+matrix:
+  base_url: https://matrix.example.com
+  room_id: "!test:example.com"
+  domain: example.com
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
+        f.write(yaml_content)
+        f.flush()
+        config_path = f.name
+
+    try:
+        config = load_config_from_yaml(config_path)
+        assert config.service_users == {}
+    finally:
+        Path(config_path).unlink()
+
+
 def test_load_config_empty_file():
     """ConfigError raised when YAML file is empty."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:

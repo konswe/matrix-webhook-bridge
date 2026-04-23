@@ -19,25 +19,6 @@ _AS_TOKEN_RE = re.compile(r"^(.+)_as_token\.txt$")
 _VALID_LOCALPART_RE = re.compile(r"^[a-z0-9._\-]+$")
 
 
-def _validate_user_localpart(user: str, handler: BaseHTTPRequestHandler) -> bool:
-    """
-    Validate that user is a valid Matrix localpart to prevent path traversal.
-
-    Returns True if valid, False otherwise. If invalid, sends 400 response.
-    """
-    if not _VALID_LOCALPART_RE.match(user):
-        logger.warning(
-            f"Invalid user localpart '{user}' from {handler.client_address}. "
-            f"Must match [a-z0-9._-]+"
-        )
-        handler.send_response(400)
-        handler.send_header("Content-Type", "text/plain")
-        handler.end_headers()
-        handler.wfile.write(b"Invalid user parameter. Must match [a-z0-9._-]+")
-        return False
-    return True
-
-
 def _pre_flight_check(config: Config) -> None:
     logger.info("Performing pre-flight check...")
 
@@ -46,6 +27,13 @@ def _pre_flight_check(config: Config) -> None:
             f"Invalid default_user '{config.default_user}'. "
             f"Must match [a-z0-9._-]+ to prevent path traversal."
         )
+
+    for svc, user in config.service_users.items():
+        if not _VALID_LOCALPART_RE.match(user):
+            raise RuntimeError(
+                f"Invalid user '{user}' for service '{svc}' in service_users. "
+                f"Must match [a-z0-9._-]+ to prevent path traversal."
+            )
 
     default_user_token_path = _token_path(config.default_user)
     if not os.path.isfile(default_user_token_path):
@@ -126,10 +114,8 @@ def _make_handler(config: Config) -> type:
 
             params = parse_qs(parsed.query)
             service = params.get("service", [None])[0]
-            user = params.get("user", [None])[0] or service or config.default_user
-
-            if not _validate_user_localpart(user, self):
-                return
+            user = config.service_users.get(service) if service else None
+            user = user or config.default_user
 
             format_fn = SERVICES.get(service, format_generic)
             user_id = f"@{user}:{config.domain}"

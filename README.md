@@ -33,22 +33,25 @@ Any HTTP client can post to `/notify`:
 
 ```sh
 # generic message
-curl -X POST "http://localhost:5001/notify?user=bridge" \
+curl -X POST "http://localhost:5001/notify" \
      -H "Content-Type: application/json" \
      -d '{"body": "Hello from the bridge!"}'
 
-# with HTML formatting
-curl -X POST "http://localhost:5001/notify?user=bridge" \
+# with a registered service formatter
+curl -X POST "http://localhost:5001/notify?service=alertmanager" \
      -H "Content-Type: application/json" \
      -d '{"body": "plain text", "html": "<b>bold text</b>"}'
 ```
 
 ### Query parameters
 
-| Parameter | Description                                                          |
-| --------- | -------------------------------------------------------------------- |
-| `user`    | Matrix user localpart to impersonate (e.g. `bridge`)                 |
-| `service` | Activates a built-in formatter; also sets the user if not specified  |
+| Parameter | Description                                                                            |
+| --------- | -------------------------------------------------------------------------------------- |
+| `service` | Activates a built-in formatter and selects the sender via `service_users` in config    |
+
+The sender (Matrix user localpart and token) is determined server-side: the `service_users` map
+in `bridge.yml` maps each service name to its user localpart. If the service is not listed,
+`default_user` is used.
 
 ## Built-in formatters
 

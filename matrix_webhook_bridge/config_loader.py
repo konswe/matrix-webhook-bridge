@@ -61,6 +61,11 @@ CONFIG_SCHEMA = {
                     "minLength": 1,
                     "description": "Shared secret for incoming webhook authentication",
                 },
+                "service_users": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string", "minLength": 1},
+                    "description": "Map of service name to Matrix user localpart",
+                },
             },
             "additionalProperties": False,
         },
@@ -121,4 +126,5 @@ def load_config_from_yaml(path: str) -> Config:
         port=server_section.get("port", 5001),
         default_user=server_section.get("default_user", "bridge"),
         webhook_secret=server_section.get("webhook_secret"),
+        service_users=server_section.get("service_users", {}),
     )
