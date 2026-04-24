@@ -56,6 +56,9 @@ docker compose up -d
 docker compose exec bridge matrix-webhook-bridge healthcheck
 ```
 
+`GET /healthy` — server liveness (uptime). `GET /healthy/matrix` — homeserver reachability.
+`GET /metrics` — Prometheus metrics (no auth required).
+
 ## Configuration reference
 
 All configuration is defined in the YAML configuration file (default: `config/bridge.yml`).

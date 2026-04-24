@@ -13,7 +13,9 @@ from uuid import uuid4
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from prometheus_client import make_asgi_app
 
+from . import metrics
 from .config import Config
 from .formatters import SERVICES, format_generic
 from .log import request_id as _request_id
@@ -133,6 +135,8 @@ app = FastAPI(
     lifespan=_lifespan,
 )
 
+app.mount("/metrics", make_asgi_app())
+
 
 def _get_config(request: Request) -> Config:
     return request.app.state.config
@@ -146,6 +150,7 @@ def _check_auth(
         return
     auth = request.headers.get("Authorization", "")
     if not hmac.compare_digest(auth, f"Bearer {config.webhook_secret}"):
+        metrics.auth_failure_total.inc()
         raise HTTPException(status_code=401)
 
 
@@ -205,13 +210,16 @@ async def notify(
     The room parameter overrides target room selection regardless of service_rooms.
     """
     _request_id.set(uuid4().hex[:8])
+    metrics.requests_total.labels(service=service or "").inc()
 
     body = await request.body()
     if len(body) > 1_048_576:
+        metrics.invalid_payload_total.labels(service=service or "").inc()
         raise HTTPException(status_code=413)
     try:
         data = json.loads(body)
     except Exception:
+        metrics.invalid_payload_total.labels(service=service or "").inc()
         raise HTTPException(status_code=400)
 
     user = config.service_users.get(service) if service else None
@@ -243,11 +251,13 @@ async def notify(
                     user_id,
                     config.matrix_timeout,
                 )
+                metrics.notify_success_total.labels(service=service or "").inc()
             except Exception as e:
                 logger.error(
                     "notify failed",
                     extra={"service": service, "user": user, "room": room_id, "error": str(e)},
                 )
+                metrics.notify_failure_total.labels(service=service or "").inc()
                 failed = True
 
     if failed:
