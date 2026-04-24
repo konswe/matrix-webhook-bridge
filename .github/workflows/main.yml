@@ -32,10 +32,19 @@ jobs:
       - name: Run tests
         run: pytest
 
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: run-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Smoke Test
+        uses: ./.github/actions/smoke_test
+
   build-image:
     name: Build Image
     runs-on: ubuntu-latest
-    needs: run-tests
+    needs: [run-tests, smoke-test]
     permissions:
       contents: read
     steps:
