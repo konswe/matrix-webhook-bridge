@@ -30,8 +30,10 @@ jobs:
             dockerfile:
               - Dockerfile
             src:
+              - ".github/actions/smoke_test/**"
               - "matrix_webhook_bridge/**"
               - "tests/**"
+              - dev_serve.py
               - pyproject.toml
 
   pre-commit:
