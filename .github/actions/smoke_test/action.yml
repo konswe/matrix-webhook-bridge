@@ -1,0 +1,33 @@
+---
+name: "Startup Smoke Test"
+description: "Verifies the bridge can start without errors"
+
+inputs:
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.13"
+  config-path:
+    description: "Path to the config file for testing"
+    required: false
+    default: "bridge.yml.example"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install "."
+
+    - name: Test Startup
+      # Start the server in the background and kill it after 5 seconds.
+      # timeout returns 124 if the command was interrupted by the timeout,
+      # which means the server started successfully and stayed alive.
+      shell: bash
+      run: |
+        timeout 5s python dev_serve.py serve --config ${{ inputs.config-path }} || [ $? -eq 124 ]
