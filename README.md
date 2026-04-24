@@ -107,7 +107,7 @@ other tools in [`integrations/`](integrations/).
 | ----------------------- | ----------------- | ------------------ | --------------------------------------------------------- |
 | Prometheus Alertmanager | built-in          | `alertmanager`     | Colour-coded alerts with severity, description and links  |
 | borgmatic               | standalone script | —                  | Backup job success/failure notifications                  |
-| CrowdSec                | standalone script | —                  | Per-decision ban/unban alerts                             |
+| CrowdSec alert          | standalone script | —                  | Per-decision ban/unban alerts                             |
 | CrowdSec summary        | standalone script | —                  | Daily digest of top attackers and blocked IPs             |
 
 ## Metrics
