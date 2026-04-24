@@ -25,6 +25,14 @@ repos:
           - --indent=2
           - --no-ensure-ascii
       - id: trailing-whitespace
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+      - id: mypy
+        files: ^matrix_webhook_bridge/
+        additional_dependencies:
+          - types-PyYAML
+          - types-jsonschema
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.29.0
     hooks:
