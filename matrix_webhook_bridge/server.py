@@ -8,10 +8,11 @@ import signal
 import threading
 import time
 from contextlib import asynccontextmanager
+from importlib.metadata import version
 from uuid import uuid4
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
 from .config import Config
 from .formatters import SERVICES, format_generic
@@ -26,6 +27,17 @@ _start_time = time.monotonic()
 _AS_TOKEN_RE = re.compile(r"^(.+)_as_token\.txt$")
 _VALID_LOCALPART_RE = re.compile(r"^[a-z0-9._\-]+$")
 _VALID_ROOM_ID_RE = re.compile(r"^![^:]+:.+$")
+
+_TAGS = [
+    {
+        "name": "health",
+        "description": "Liveness and readiness probes.",
+    },
+    {
+        "name": "notifications",
+        "description": "Forward webhook payloads to Matrix rooms.",
+    },
+]
 
 
 def _pre_flight_check(config: Config) -> None:
@@ -110,7 +122,16 @@ async def _lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=_lifespan)
+app = FastAPI(
+    title="Matrix Webhook Bridge",
+    description=(
+        "Receives webhook POST requests and forwards formatted messages "
+        "to one or more Matrix rooms via the Matrix Application Service API."
+    ),
+    version=version("matrix-webhook-bridge"),
+    openapi_tags=_TAGS,
+    lifespan=_lifespan,
+)
 
 
 def _get_config(request: Request) -> Config:
@@ -128,14 +149,21 @@ def _check_auth(
         raise HTTPException(status_code=401)
 
 
-@app.get("/healthy")
+@app.get("/healthy", summary="Server health check", tags=["health"])
 def healthy(config: Config = Depends(_get_config)):
+    """Return server status and uptime."""
     uptime = _format_uptime(int(time.monotonic() - _start_time))
     return {"status": "ok", "uptime": uptime}
 
 
-@app.get("/healthy/matrix")
+@app.get(
+    "/healthy/matrix",
+    summary="Matrix homeserver health check",
+    tags=["health"],
+    responses={503: {"description": "Matrix homeserver is unreachable"}},
+)
 async def healthy_matrix(config: Config = Depends(_get_config)):
+    """Probe the configured Matrix homeserver and return its reachability status."""
     try:
         await asyncio.to_thread(_matrix_probe, config.base_url, config.matrix_timeout)
     except Exception as e:
@@ -146,14 +174,36 @@ async def healthy_matrix(config: Config = Depends(_get_config)):
     return {"status": "ok", "base_url": config.base_url}
 
 
-@app.post("/notify")
+@app.post(
+    "/notify",
+    summary="Send a webhook notification to Matrix",
+    tags=["notifications"],
+    responses={
+        400: {"description": "Request body is not valid JSON"},
+        401: {"description": "Missing or invalid Authorization header"},
+        413: {"description": "Request body exceeds 1 MiB"},
+        500: {"description": "One or more Matrix deliveries failed"},
+    },
+)
 async def notify(
     request: Request,
-    service: str | None = None,
-    room: str | None = None,
+    service: str | None = Query(
+        None,
+        description="Service name; selects the formatter, sending user, and target rooms",
+    ),
+    room: str | None = Query(
+        None,
+        description="Target room ID (e.g. !abc:example.com); overrides service_rooms",
+    ),
     config: Config = Depends(_get_config),
     _: None = Depends(_check_auth),
 ):
+    """Forward a webhook payload to one or more Matrix rooms.
+
+    The service parameter selects the formatter (defaults to generic), the
+    sending user (from service_users), and target rooms (from service_rooms).
+    The room parameter overrides target room selection regardless of service_rooms.
+    """
     _request_id.set(uuid4().hex[:8])
 
     body = await request.body()
