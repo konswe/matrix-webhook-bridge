@@ -132,3 +132,11 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:5001"]
 ```
+
+## Disclaimer
+
+This is developed with agentic assistance -- there is no warranty of fitness
+for any purpose.
+
+It's been guided by an engineer with a passion for clean code, nice CX
+and good docs, but it's still heavy in LLM output, so you may find some bugs.
